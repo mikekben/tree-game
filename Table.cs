@@ -10,13 +10,17 @@ namespace tree_game
     {
         public static Exception badTableException = new Exception("The input file is not in the correct format.");
         public int size;
+        public int treeNumber;
         Cell[][] contents;
+
+        int[] colors;
 
         public Table(string file)
         {
             string[] strings = File.ReadAllLines(file);
             //Read the size of the table from the first line of the file
-            size = int.Parse(strings[0]);
+            size = int.Parse(strings[0].Split(',')[0]);
+            treeNumber = int.Parse(strings[0].Split(',')[1]);
             if (strings.Length != size + 2)
             {
                 throw badTableException;
@@ -37,6 +41,34 @@ namespace tree_game
                     i++;
                 }
             }
+            colors = this.Select(x => x.color).Distinct().ToArray();
+        }
+
+        public Table(int size, int treeNumber, Cell[][] contents)
+        {
+            this.size = size;
+            this.treeNumber = treeNumber;
+            this.contents = contents;
+            this.colors = this.Select(x => x.color).Distinct().ToArray();
+        }
+
+        public Table Copy()
+        {
+            //Make a completely new copy of every cell
+            Cell[][] newArray = new Cell[size][];
+            for (int i = 0; i < size; i++)
+            {
+                newArray[i] = new Cell[size];
+                for (int j = 0; j < size; j++)
+                {
+                    Cell t = new Cell(null, i, j, this[i, j].color);
+                    newArray[i][j] = t;
+                }
+            }
+            Table toReturn = new Table(size, treeNumber, newArray);
+            //This can only be done after the table has been constructed
+            foreach (Cell c in toReturn) { c.table = toReturn; }
+            return toReturn;
         }
 
         public Cell this[int row, int col] => contents[row][col];
@@ -67,6 +99,33 @@ namespace tree_game
             Console.ForegroundColor = ConsoleColor.White;
         }
 
+        public void RunCells()
+        {
+            //Try adding a tree at each cell to exclude 
+            foreach (Cell c in this)
+            {
+                if (c.fill == CellFill.empty)
+                {
+                    Table newTab = Copy();
+                    newTab[c.row, c.col].PlaceTree();
+                    if (!newTab.Validate()) { c.fill = CellFill.excluded; }
+                }
+            }
+        }
+        public bool Validate()
+        {
+            for (int i = 0; i < size; i++)
+            {
+                if (treeNumber - CountRow(i) > EmptyInRow(i).Count()) { return false; }
+                if (treeNumber - CountCol(i) > EmptyInCol(i).Count()) { return false; }
+            }
+            foreach (int c in colors)
+            {
+                if (treeNumber - CountColor(c) > EmptyInColor(c).Count()) { return false; }
+            }
+            return true;
+        }
+
 
         public int CountRow(int row) => contents[row].Count(x => x.fill == CellFill.tree);
         public int CountCol(int col) => contents.Count(x => x[col].fill == CellFill.tree);
@@ -74,6 +133,6 @@ namespace tree_game
 
         public IEnumerable<Cell> EmptyInRow(int row) => contents[row].Where(x => x.fill == CellFill.empty);
         public IEnumerable<Cell> EmptyInCol(int col) => contents.Select(x => x[col]).Where(x => x.fill == CellFill.empty);
-        public IEnumerable<Cell> EmptyInColor(int color) => this.Where(x=>x.color == color && x.fill == CellFill.empty);
+        public IEnumerable<Cell> EmptyInColor(int color) => this.Where(x => x.color == color && x.fill == CellFill.empty);
     }
 }
